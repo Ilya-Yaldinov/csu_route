@@ -1,38 +1,65 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
-using System;
+using System.Collections.Generic;
 
 public class EditWindow : MonoBehaviour
 {
-    private bool _isCabinetButtonActive = false;
-    private bool _isInterestButtonActive = false;    
     public GameObject Save;
-    
     public GameObject Popup;
-    public TMP_InputField fieldFirst;
-    public TMP_InputField fieldSecond;
-    public TMP_InputField fieldThird;
+    public TMP_InputField FieldFirst;
+    public TMP_InputField FieldSecond;
+    public TMP_InputField FieldThird;
+    public TMP_Text Header;
 
+    private PointOfInterest curPoint;
+    private List<PointOfInterest> points;
+    private bool isCabinetButtonActive = false;
+    private bool isInterestButtonActive = false;
+    private IOFileWork ioFile;
+    
     void Start()
     {
-        AddEventListener(Save);
+        points = new List<PointOfInterest>();
+        ioFile = new IOFileWork( @"\file.json");
+        StartWithPoints();
+    }
+
+    private void StartWithPoints()
+    {
+        var properties = ioFile.Read();
+        foreach(var item in properties)
+        {
+            PointOfInterest poi;
+            if(item.PointClass == 1)
+            {
+                poi = new PointOfInterest(item, 
+                    new PopupInternalText("Кабинет", "Введите номер кабинета", "Введите назначение кабинета", "Введите заведующего"),
+                    Color.black, OpenPopup);
+            }
+            else
+            {
+                poi = new PointOfInterest(item, 
+                    new PopupInternalText("Точка интереса", "Введите название", "Введите краткое описание", "Введите аналоги названия"),
+                    Color.red, OpenPopup);
+            }
+            var button = poi.CreatePoint();
+            points.Add(poi);
+            button.transform.SetParent(transform, false);
+        }
     }
 
     void Update()
     {
         if(Input.GetMouseButtonDown(0))
         {
-            if(_isCabinetButtonActive && !IsMouseOverUI())
+            if(isCabinetButtonActive && !IsMouseOverUI())
             {
-                SpawnButton(Color.black);
+                SpawnButton(Color.black, new PopupInternalText("Кабинет", "Введите номер кабинета", "Введите назначение кабинета", "Введите заведующего"));
             }
-            else if(_isInterestButtonActive && !IsMouseOverUI())
+            else if(isInterestButtonActive && !IsMouseOverUI())
             {
-                SpawnButton(Color.red);
+                SpawnButton(Color.red, new PopupInternalText("Точка интереса", "Введите название", "Введите краткое описание", "Введите аналоги названия"));
             }
         }
     }
@@ -52,31 +79,52 @@ public class EditWindow : MonoBehaviour
         return pos;
     }
 
-    private void SpawnButton(Color color)
+    private void SpawnButton(Color color, PopupInternalText pit)
     {
         var pos = getPosition();
-        PointOfInterest pointOfInterest = new PointOfInterest(pos, color, OpenPopup);
+        PointOfInterest pointOfInterest = new PointOfInterest(pos, color, OpenPopup, pit);
         var button = pointOfInterest.CreatePoint();
+
+        points.Add(pointOfInterest);
 
         button.transform.SetParent(transform, false);
     }
 
     public void CabinetPress()
     {
-        _isCabinetButtonActive = !_isCabinetButtonActive;
+        isCabinetButtonActive = !isCabinetButtonActive;
     }
 
     public void InterestPress()
     {
-        _isInterestButtonActive = !_isInterestButtonActive;
+        isInterestButtonActive = !isInterestButtonActive;
     }
 
-    private void OpenPopup()
+    private void OpenPopup(PointOfInterest poi)
     {
         if(Popup != null)
         {
+            curPoint = poi;
+
+            Header.text = curPoint.curPopupText.Header;
+            FieldFirst.placeholder.GetComponent<TextMeshProUGUI>().text = curPoint.curPopupText.HintFirst;
+            FieldSecond.placeholder.GetComponent<TextMeshProUGUI>().text = curPoint.curPopupText.HintSecond;
+            FieldThird.placeholder.GetComponent<TextMeshProUGUI>().text = curPoint.curPopupText.HintThird;
+            
+            FieldFirst.text = curPoint.curProperties.TextFirst;
+            FieldSecond.text = curPoint.curProperties.TextSecond;
+            FieldThird.text = curPoint.curProperties.TextThird;
+
+            Popup.transform.SetAsLastSibling();
             Popup.SetActive(true);
         }
+    }
+
+    public void SaveAll()
+    {   
+        List<PointProperties> properties = new List<PointProperties>();
+        points.ForEach(x => properties.Add(x.curProperties));
+        ioFile.Write(properties);
     }
 
     private void ClosePopup()
@@ -87,61 +135,18 @@ public class EditWindow : MonoBehaviour
         }
     }
 
-    private void AddEventListener(GameObject obj)
+    public void SavePopup()
     {
-        obj.AddComponent(typeof(EventTrigger));
-        EventTrigger trigger = obj.GetComponent<EventTrigger>();
-        EventTrigger.Entry entry = new EventTrigger.Entry();
-        entry.eventID = EventTriggerType.PointerClick;
-        entry.callback.AddListener( (eventData) => { ClosePopup(); });
-        trigger.triggers.Add(entry);
-    }
-}
+        curPoint.curProperties.TextFirst = FieldFirst.text;
+        curPoint.curProperties.TextSecond = FieldSecond.text;
+        curPoint.curProperties.TextThird = FieldThird.text;
 
-class PointOfInterest
-{
-    private Vector2 _buttonSize = new Vector2(20f, 20f);
-    private Vector3 _position;
-    private Color _btnColor;
-    private Action _buttonEvent;
-
-    public PointOfInterest(Vector3 position, Color color, Action action)
-    {
-        this._position = position;
-        this._btnColor = color;
-        this._buttonEvent = action;
+        ClosePopup();
     }
 
-    public GameObject CreatePoint()
+    public void DeletePoint()
     {
-        GameObject buttonObject = new GameObject("Button"); // Создаем новый объект кнопки
-
-        // Добавляем компоненты RectTransform и Button
-        RectTransform rectTransform = buttonObject.AddComponent<RectTransform>();
-        Button button = buttonObject.AddComponent<Button>();
-
-        // Устанавливаем размер кнопки
-        rectTransform.sizeDelta = _buttonSize;
-
-        // Устанавливаем позицию кнопки
-        rectTransform.anchoredPosition = _position;
-
-        // Устанавливаем цвет фона кнопки
-        Image buttonImage = buttonObject.AddComponent<Image>();
-        buttonImage.color = _btnColor;
-
-        AddEventListener(buttonObject);
-
-        return buttonObject;
-    }
-
-    private void AddEventListener(GameObject button)
-    {
-        button.AddComponent(typeof(EventTrigger));
-        EventTrigger trigger = button.GetComponent<EventTrigger>();
-        EventTrigger.Entry entry = new EventTrigger.Entry();
-        entry.eventID = EventTriggerType.PointerClick;
-        entry.callback.AddListener( (eventData) => { _buttonEvent(); });
-        trigger.triggers.Add(entry);
+        DestroyImmediate(curPoint.curButton);
+        ClosePopup();
     }
 }

@@ -1,0 +1,20 @@
+{
+    "Points": [
+        {
+            "PointClass": 1,
+            "X": -229.99996948242188,
+            "Y": 226.5,
+            "TextFirst": "331",
+            "TextSecond": "Деканат ИИТ",
+            "TextThird": "Петриченко Ю.В."
+        },
+        {
+            "PointClass": 2,
+            "X": -63.5,
+            "Y": 165.0,
+            "TextFirst": "Прикол",
+            "TextSecond": "",
+            "TextThird": "Приколюха, Шутейка"
+        }
+    ]
+}
