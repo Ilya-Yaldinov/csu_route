@@ -19,10 +19,10 @@ public class IOFileWork
         await File.WriteAllTextAsync(path, JsonUtility.ToJson(map));
     }
 
-    public List<PointProperties> Read()
+    public MapProperties Read()
     {   
         string file = File.ReadAllText(path);
         MapProperties map = JsonUtility.FromJson<MapProperties>(file);
-        return map.Points;
+        return map;
     }
 }

@@ -2,50 +2,50 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using TMPro;
 using System.Collections.Generic;
+using System.Linq;
 
 public class EditWindow : MonoBehaviour
 {
+    public GameObject PopupCabinet;
+    public GameObject PopupInterest;
+    public GameObject PopupLadder;
     public GameObject Save;
-    public GameObject Popup;
-    public TMP_InputField FieldFirst;
-    public TMP_InputField FieldSecond;
-    public TMP_InputField FieldThird;
-    public TMP_Text Header;
 
-    private PointOfInterest curPoint;
-    private List<PointOfInterest> points;
+    
     private bool isCabinetButtonActive = false;
     private bool isInterestButtonActive = false;
+    private bool isLadderButtonActive = false;
     private IOFileWork ioFile;
+    private Point curPoint;
+    private List<Point> points;
     
     void Start()
     {
-        points = new List<PointOfInterest>();
+        points = new List<Point>();
         ioFile = new IOFileWork( @"\file.json");
-        StartWithPoints();
+        // StartWithPoints();
     }
 
     private void StartWithPoints()
     {
-        var properties = ioFile.Read();
-        foreach(var item in properties)
+        var propertiesList = ioFile.Read();
+        foreach (var properties in propertiesList.Points)
         {
-            PointOfInterest poi;
-            if(item.PointClass == 1)
+            switch(properties.PointClass)
             {
-                poi = new PointOfInterest(item, 
-                    new PopupInternalText("Кабинет", "Введите номер кабинета", "Введите назначение кабинета", "Введите заведующего"),
-                    Color.black, OpenPopup);
+                case 1:
+                    AddPointToCanvas(new Cabinet(properties, OpenPopupCabinet));
+                    break;
+                case 2:
+                    AddPointToCanvas(new Interest(properties, OpenPopupCabinet));
+                    break;
+                case 3:
+                    AddPointToCanvas(new Ladder(properties, OpenPopupCabinet));
+                    break;
+                default:
+                    break;
+
             }
-            else
-            {
-                poi = new PointOfInterest(item, 
-                    new PopupInternalText("Точка интереса", "Введите название", "Введите краткое описание", "Введите аналоги названия"),
-                    Color.red, OpenPopup);
-            }
-            var button = poi.CreatePoint();
-            points.Add(poi);
-            button.transform.SetParent(transform, false);
         }
     }
 
@@ -53,13 +53,18 @@ public class EditWindow : MonoBehaviour
     {
         if(Input.GetMouseButtonDown(0))
         {
+            var pos = getPosition();
             if(isCabinetButtonActive && !IsMouseOverUI())
             {
-                SpawnButton(Color.black, new PopupInternalText("Кабинет", "Введите номер кабинета", "Введите назначение кабинета", "Введите заведующего"));
+                AddPointToCanvas(new Cabinet(pos, OpenPopupCabinet));
             }
             else if(isInterestButtonActive && !IsMouseOverUI())
             {
-                SpawnButton(Color.red, new PopupInternalText("Точка интереса", "Введите название", "Введите краткое описание", "Введите аналоги названия"));
+                AddPointToCanvas(new Interest(pos, OpenPopupInterest));
+            }
+            else if(isLadderButtonActive && !IsMouseOverUI())
+            {
+                AddPointToCanvas(new Ladder(pos, OpenPopupLadder));
             }
         }
     }
@@ -72,21 +77,16 @@ public class EditWindow : MonoBehaviour
     private Vector3 getPosition()
     {
         Vector3 pos = Input.mousePosition;
-        Debug.Log(pos);
         pos.x -= Screen.width / 2;
         pos.y -= Screen.height / 2;
 
         return pos;
     }
 
-    private void SpawnButton(Color color, PopupInternalText pit)
+    private void AddPointToCanvas(Point point)
     {
-        var pos = getPosition();
-        PointOfInterest pointOfInterest = new PointOfInterest(pos, color, OpenPopup, pit);
-        var button = pointOfInterest.CreatePoint();
-
-        points.Add(pointOfInterest);
-
+        var button = point.CreatePoint();
+        points.Add(point);
         button.transform.SetParent(transform, false);
     }
 
@@ -100,53 +100,121 @@ public class EditWindow : MonoBehaviour
         isInterestButtonActive = !isInterestButtonActive;
     }
 
-    private void OpenPopup(PointOfInterest poi)
+    public void LadderPress()
     {
-        if(Popup != null)
-        {
-            curPoint = poi;
+        isLadderButtonActive = !isLadderButtonActive;
+    }
 
-            Header.text = curPoint.curPopupText.Header;
-            FieldFirst.placeholder.GetComponent<TextMeshProUGUI>().text = curPoint.curPopupText.HintFirst;
-            FieldSecond.placeholder.GetComponent<TextMeshProUGUI>().text = curPoint.curPopupText.HintSecond;
-            FieldThird.placeholder.GetComponent<TextMeshProUGUI>().text = curPoint.curPopupText.HintThird;
+    private void OpenPopupCabinet(Point point)
+    {
+        if(PopupCabinet != null)
+        {
+            curPoint = point;
             
-            FieldFirst.text = curPoint.curProperties.TextFirst;
-            FieldSecond.text = curPoint.curProperties.TextSecond;
-            FieldThird.text = curPoint.curProperties.TextThird;
+            var textFields = PopupCabinet.GetComponentsInChildren<TMP_InputField>();
+            SetTextField(textFields);
 
-            Popup.transform.SetAsLastSibling();
-            Popup.SetActive(true);
+            PopupCabinet.transform.SetAsLastSibling();
+            PopupCabinet.SetActive(true);
         }
     }
 
-    public void SaveAll()
-    {   
-        List<PointProperties> properties = new List<PointProperties>();
-        points.ForEach(x => properties.Add(x.curProperties));
-        ioFile.Write(properties);
+    public void SavePopupCabinet()
+    {
+        var textFields = PopupCabinet.GetComponentsInChildren<TMP_InputField>();
+        SaveTextField(textFields);
+        CloseAllPopups();
     }
 
-    private void ClosePopup()
+    private void OpenPopupInterest(Point point)
     {
-        if(Popup != null)
+        if(PopupInterest != null)
         {
-            Popup.SetActive(false);
+            curPoint = point;
+
+            var textFields = PopupInterest.GetComponentsInChildren<TMP_InputField>();
+            SetTextField(textFields);
+
+            PopupInterest.transform.SetAsLastSibling();
+            PopupInterest.SetActive(true);
         }
     }
 
-    public void SavePopup()
+    public void SavePopupInterest()
     {
-        curPoint.curProperties.TextFirst = FieldFirst.text;
-        curPoint.curProperties.TextSecond = FieldSecond.text;
-        curPoint.curProperties.TextThird = FieldThird.text;
+        var textFields = PopupInterest.GetComponentsInChildren<TMP_InputField>();
+        SaveTextField(textFields);
+        CloseAllPopups();
+    }
 
-        ClosePopup();
+    private void OpenPopupLadder(Point point)
+    {
+        if(PopupLadder != null)
+        {
+            curPoint = point;
+
+            var textField = PopupLadder.GetComponentInChildren<TMP_InputField>();
+            curPoint.curProperties.TextFirst = textField.text;
+
+            var dropDowns = PopupLadder.GetComponentsInChildren<TMP_Dropdown>();
+            foreach (var item in points)
+            {
+                if(item is Ladder)
+                {
+                    dropDowns.ToList().ForEach(x => x.options.Add(new TMP_Dropdown.OptionData(){text = item.curProperties.TextFirst}));
+                }
+            }
+
+            PopupLadder.transform.SetAsLastSibling();
+            PopupLadder.SetActive(true);
+        }
+    }
+
+    public void SavePopupLadder()
+    {
+        var textFields = PopupLadder.GetComponentsInChildren<TMP_InputField>();
+        SaveTextField(textFields);
+        CloseAllPopups();
+    }
+
+    public void CloseAllPopups()
+    {
+        PopupCabinet.SetActive(false);
+        PopupInterest.SetActive(false);
+        PopupLadder.SetActive(false);
     }
 
     public void DeletePoint()
     {
         DestroyImmediate(curPoint.curButton);
-        ClosePopup();
+        DeletePointFromList();
+        CloseAllPopups();
+    }
+
+    private void DeletePointFromList()
+    {
+        points.Remove(curPoint);
+    }
+
+    private void SaveTextField(TMP_InputField[] textFields)
+    {
+        curPoint.curProperties.TextFirst = textFields[0].text;
+        curPoint.curProperties.TextSecond = textFields[1].text;
+        curPoint.curProperties.TextThird = textFields[2].text;
+    }
+
+    private void SetTextField(TMP_InputField[] textFields)
+    {
+        textFields[0].text = curPoint.curProperties.TextFirst;
+        textFields[1].text = curPoint.curProperties.TextSecond;
+        textFields[2].text = curPoint.curProperties.TextThird;
+    }
+
+
+    public void SaveAll()
+    {   
+        List<PointProperties> pointsProperties = new List<PointProperties>();
+        points.ForEach(x => pointsProperties.Add(x.curProperties));
+        ioFile.Write(pointsProperties);
     }
 }
